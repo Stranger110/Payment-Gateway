@@ -1,36 +1,43 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const stripepay = require('./routes/payment-intent')
 const bodyParser = require('body-parser');
+const gpay = require('./routes/stripePayment');
+const razor = require('./routes/razorpay');
+
 
 app.use(express.json());
 app.use(cors({
   origin: 'http://localhost:5173',  // The origin of your frontend
   methods: 'GET, POST',
 }));
-app.use('/api', stripepay);
+
+
+app.use("/create-order", razor);
+app.use('/api/stripe', gpay);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// app.post('/create-payment-intent', async (req, res) => {
-//   const { paymentMethodId, amount } = req.body;
+app.post('/api/stripe/payment', async (req, res) => {
+  const { token, amount } = req.body;
 
-//   try {
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: amount,   // Amount in cents
-//       currency: 'usd',
-//       payment_method: paymentMethodId,
-//       confirm: true,   // Immediately confirm the payment
-//     });
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount in smallest currency unit (e.g., cents)
+      currency: 'usd',
+      payment_method_data: {
+        type: 'card',
+        card: { token: token }, // Use the token from Google Pay
+      },
+      confirm: true, // Automatically confirm the payment
+    });
 
-//     res.send({
-//       clientSecret: paymentIntent.client_secret,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
+    res.json({ success: true, paymentIntent });
+  } catch (error) {
+    console.error('Payment failed:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
 
 // Import your routes
 const createOrderRoute = require('./routes/createOrder');
